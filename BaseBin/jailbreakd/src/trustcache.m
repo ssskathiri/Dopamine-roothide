@@ -292,10 +292,10 @@ uint64_t staticTrustCacheUploadFile(trustcache_file *fileToUpload, size_t fileSi
 // 	return mapKaddr;
 // }
 
-uint64_t staticTrustCacheUploadFileAtPath(NSString *filePath, size_t *outMapSize)
-{
-	if (!filePath) return 0;
-	NSData *tcData = [NSData dataWithContentsOfFile:filePath];
-	if (!tcData) return 0;
-	return staticTrustCacheUploadFile((trustcache_file *)tcData.bytes, tcData.length, outMapSize);
-}
+// uint64_t staticTrustCacheUploadFileAtPath(NSString *filePath, size_t *outMapSize)
+// {
+// 	if (!filePath) return 0;
+// 	NSData *tcData = [NSData dataWithContentsOfFile:filePath];
+// 	if (!tcData) return 0;
+// 	return staticTrustCacheUploadFile((trustcache_file *)tcData.bytes, tcData.length, outMapSize);
+// }

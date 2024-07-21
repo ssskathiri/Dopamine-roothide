@@ -53,6 +53,15 @@ xpc_object_t launchd_xpc_send_message(xpc_object_t xdict)
 
 void patchBaseBinLaunchDaemonPlist(NSString *plistPath)
 {
+	char* JBRAND = getenv("JBRAND");
+	if(JBRAND) {
+		NSString* plistContent = [NSString stringWithContentsOfFile:plistPath encoding:NSUTF8StringEncoding error:nil];
+		if ([plistContent containsString:@"%JBRAND%"]) {
+			plistContent = [plistContent stringByReplacingOccurrencesOfString:@"%JBRAND%" withString:@(JBRAND)];
+			[plistContent writeToFile:plistPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+		}
+	}
+
 	NSMutableDictionary *plistDict = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
 	if (plistDict) {
 		NSMutableArray *programArguments = ((NSArray *)plistDict[@"ProgramArguments"]).mutableCopy;

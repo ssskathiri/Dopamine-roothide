@@ -36,13 +36,15 @@ NSString *generateSystemWideSandboxExtensions(BOOL ext)
 	char* class = ext ? "com.apple.app-sandbox.read-write" : "com.apple.app-sandbox.read";
 	[extensionString appendString:[NSString stringWithUTF8String:sandbox_extension_issue_file(class, jbrootsecondary, 0)]];
 	[extensionString appendString:@"|"];
-	[extensionString appendString:[NSString stringWithUTF8String:sandbox_extension_issue_file("com.apple.sandbox.executable", jbrootsecondary, 0)]];
-	[extensionString appendString:@"|"];
+	// [extensionString appendString:[NSString stringWithUTF8String:sandbox_extension_issue_file("com.apple.sandbox.executable", jbrootsecondary, 0)]];
+	// [extensionString appendString:@"|"];
 
 	// Ensure the whole system has access to com.opa334.jailbreakd.systemwide
-	[extensionString appendString:[NSString stringWithUTF8String:sandbox_extension_issue_mach("com.apple.app-sandbox.mach", "com.opa334.jailbreakd.systemwide", 0)]];
+	char service_name[128];
+	snprintf(service_name,sizeof(service_name),"com.opa334.jailbreakd.systemwide-%s",JBRAND);
+	[extensionString appendString:[NSString stringWithUTF8String:sandbox_extension_issue_mach("com.apple.app-sandbox.mach", service_name, 0)]];
 	[extensionString appendString:@"|"];
-	[extensionString appendString:[NSString stringWithUTF8String:sandbox_extension_issue_mach("com.apple.security.exception.mach-lookup.global-name", "com.opa334.jailbreakd.systemwide", 0)]];
+	[extensionString appendString:[NSString stringWithUTF8String:sandbox_extension_issue_mach("com.apple.security.exception.mach-lookup.global-name", service_name, 0)]];
 
 	return extensionString;
 }

@@ -80,7 +80,9 @@ kern_return_t bootstrap_look_up(mach_port_t port, const char *service, mach_port
 
 bool jbdSystemWideIsReachable(void)
 {
-	int sbc = sandbox_check(getpid(), "mach-lookup", SANDBOX_FILTER_GLOBAL_NAME | SANDBOX_CHECK_NO_REPORT, "com.opa334.jailbreakd.systemwide");
+	char service_name[128];
+	snprintf(service_name,sizeof(service_name),"com.opa334.jailbreakd.systemwide-%s",JBRAND);
+	int sbc = sandbox_check(getpid(), "mach-lookup", SANDBOX_FILTER_GLOBAL_NAME | SANDBOX_CHECK_NO_REPORT, service_name);
 	return sbc == 0;
 }
 
@@ -95,7 +97,9 @@ mach_port_t jbdSystemWideMachPort(void)
 		mach_port_deallocate(mach_task_self(), self_host);
 	}
 	else {
-		kr = bootstrap_look_up(bootstrap_port, "com.opa334.jailbreakd.systemwide", &outPort);
+		char service_name[128];
+		snprintf(service_name,sizeof(service_name),"com.opa334.jailbreakd.systemwide-%s",JBRAND);
+		kr = bootstrap_look_up(bootstrap_port, service_name, &outPort);
 	}
 
 	if (kr != KERN_SUCCESS) return MACH_PORT_NULL;

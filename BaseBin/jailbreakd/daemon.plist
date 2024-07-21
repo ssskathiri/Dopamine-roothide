@@ -13,7 +13,7 @@
 			<key>HostSpecialPort</key>
 			<integer>16</integer>
 		</dict>
-		<key>com.opa334.jailbreakd.systemwide</key>
+		<key>com.opa334.jailbreakd.systemwide-%JBRAND%</key>
 		<true/>
 	</dict>
 	<key>ProgramArguments</key>

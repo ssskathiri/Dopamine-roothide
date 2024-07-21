@@ -721,8 +721,11 @@ int main(int argc, char* argv[])
 			return 1;
 		}
 
+		char service_name[128];
+		snprintf(service_name,sizeof(service_name),"com.opa334.jailbreakd.systemwide-%s",JBRAND);
+
 		mach_port_t machPortSystemWide = 0;
-		kr = bootstrap_check_in(bootstrap_port, "com.opa334.jailbreakd.systemwide", &machPortSystemWide);
+		kr = bootstrap_check_in(bootstrap_port, service_name, &machPortSystemWide);
 		if (kr != KERN_SUCCESS) {
 			JBLogError("Failed com.opa334.jailbreakd.systemwide bootstrap check in: %d (%s)", kr, mach_error_string(kr));
 			return 1;
