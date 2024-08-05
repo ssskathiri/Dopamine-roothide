@@ -5,6 +5,7 @@ CFLAGS = -Werror -I../_shared -I./src -isysroot $(shell xcrun --sdk iphoneos --s
 LDFLAGS = -dynamiclib
 
 sign: $(TARGET)
+	@strip -N $^
 	@ldid -S $^
 
 $(TARGET): $(wildcard src/*.c)

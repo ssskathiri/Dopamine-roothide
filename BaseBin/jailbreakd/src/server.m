@@ -310,36 +310,10 @@ void jailbreakd_received_message(mach_port_t machPort, bool systemwide)
 									|| msgId == JBD_MSG_PATCH_SPAWN
 									|| msgId == JBD_MSG_PATCH_EXEC_ADD
 									|| msgId == JBD_MSG_PATCH_EXEC_DEL
-									|| msgId == JBD_MSG_LOCK_DSC_PAGE
 									;
 
 			if (!systemwide || isAllowedSystemWide) {
 				switch (msgId) {
-
-					case JBD_MSG_LOCK_DSC_PAGE : {
-						int64_t result = 0;
-						uint64_t addr = xpc_dictionary_get_uint64(message, "addr");
-						uint64_t size = xpc_dictionary_get_uint64(message, "size");
-
-						JBLogDebug("lock dsc page %16llx %x from %d",addr,size,clientPid);
-						
-						task_port_t task = MACH_PORT_NULL;
-						kern_return_t kr = task_for_pid(mach_task_self(), clientPid, &task);
-						if(kr == KERN_SUCCESS && MACH_PORT_VALID(task)) {
-    						kr = mach_vm_wire(mach_host_self(), task, addr, size, VM_PROT_READ);
-							if(kr != KERN_SUCCESS) {
-								JBLogDebug("mach_vm_wire: %d,%s", kr, mach_error_string(kr));
-								result = -102;
-							}
-							mach_port_deallocate(mach_task_self(), task);
-						} else {
-							JBLogDebug("task_for_pid: %d,%s", kr, mach_error_string(kr));
-							result = -101;
-						}
-
-						xpc_dictionary_set_int64(reply, "result", result);
-						break;
-					}
 
 					case JBD_MSG_REBOOT_USERSPACE: {
 						int64_t result = -1;

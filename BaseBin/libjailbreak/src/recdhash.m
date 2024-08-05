@@ -190,12 +190,6 @@ int ensure_randomized_cdhash(const char* inputPath, void* cdhashOut)
     JBLogDebug("__TEXT: %llx,%llx, %016llX %016llX\n", textsegoffset, textsegment.fileoff, *rd, *rd2);
 
 	bool isAppPath = is_app_path(inputPath);
-	
-	//Ignore removable system apps
-	if(isAppPath && rd==0 && rd2==0) {
-		fat_free(fat);
-        return -1;
-	}
 
     int retval=-1;
 
@@ -222,7 +216,8 @@ int ensure_randomized_cdhash(const char* inputPath, void* cdhashOut)
 		
 		uint64_t jbrand = strtoull(getenv("JBRAND"),NULL,16);
 
-		if(!isAppPath && *rd==0 && *rd2 == jbrand) 
+		if( (isAppPath && *rd==0 && *rd2==0) //Ignore macho for installable apps (removable system apps or other stuff)
+			|| (!isAppPath && *rd==0 && *rd2 == jbrand) )
 		{
 			retval = csd_code_directory_calculate_hash(bestCDBlob, cdhashOut);
 			break;
