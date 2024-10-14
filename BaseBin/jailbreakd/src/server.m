@@ -55,11 +55,11 @@ void ensure_jbroot_symlink(const char* filepath)
 	char realfpath[PATH_MAX];
 	assert(realpath(filepath, realfpath) != NULL);
 
-	char realdirpath[PATH_MAX];
+	char realdirpath[PATH_MAX+1];
 	dirname_r(realfpath, realdirpath);
 	if(realdirpath[strlen(realdirpath)] != '/') strcat(realdirpath, "/");
 
-	char jbrootpath[PATH_MAX];
+	char jbrootpath[PATH_MAX+1];
 	assert(realpath(getenv("JBROOT"), jbrootpath) != NULL);
 	if(jbrootpath[strlen(jbrootpath)] != '/') strcat(jbrootpath, "/");
 

@@ -120,6 +120,10 @@ func jailbreak(completion: @escaping (Error?) -> ()) {
             }
         }
         
+        DispatchQueue.main.async {
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+
         try Fugu15.startEnvironment()
         
         DispatchQueue.main.async {
