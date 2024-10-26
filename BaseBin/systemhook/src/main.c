@@ -107,6 +107,7 @@ int posix_spawn_hook(pid_t *restrict pidp, const char *restrict path,
 					   char *const argv[restrict],
 					   char *const envp[restrict])
 {
+	int ret = -1;
 
 	posix_spawnattr_t attr=NULL;
 	if(!attrp) {
@@ -115,9 +116,7 @@ int posix_spawn_hook(pid_t *restrict pidp, const char *restrict path,
 	}
 
 	short flags = 0;
-    posix_spawnattr_getflags(attrp, &flags);
-
-	//??if(flags&POSIX_SPAWN_START_SUSPENDED) abort();
+	posix_spawnattr_getflags(attrp, &flags);
 
 	#define POSIX_SPAWN_PROC_TYPE_DRIVER 0x700
 	int posix_spawnattr_getprocesstype_np(const posix_spawnattr_t * __restrict, int * __restrict) __API_AVAILABLE(macos(10.8), ios(6.0));
@@ -126,7 +125,7 @@ int posix_spawn_hook(pid_t *restrict pidp, const char *restrict path,
 	posix_spawnattr_getprocesstype_np(attrp, &proctype);
 
 	bool suspend = (proctype != POSIX_SPAWN_PROC_TYPE_DRIVER);
-	bool should_resume = (flags&POSIX_SPAWN_START_SUSPENDED)==0;
+	bool should_resume = suspend && (flags&POSIX_SPAWN_START_SUSPENDED)==0;
 	bool patch_exec = suspend && (flags&POSIX_SPAWN_SETEXEC) != 0;
 
 	if(suspend) {
@@ -134,28 +133,35 @@ int posix_spawn_hook(pid_t *restrict pidp, const char *restrict path,
 	}
 
 	if(patch_exec) {
-		if(jbdswPatchExecAdd(path, should_resume)!=0) { //jdb fault? restore
+		if(jbdswPatchExecAdd(path, should_resume)!=0) { //jdb fault?
+			// restore flags
 			posix_spawnattr_setflags(attrp, flags);
-			patch_exec = false;
-			suspend = false;
+			ret = 99;
+			goto end;
 		}
 	}
 	
 	int pid=0;
-	int ret = spawn_hook_common(&pid, path, file_actions, attrp, argv, envp, posix_spawn);
+	ret = spawn_hook_common(&pid, path, file_actions, attrp, argv, envp, posix_spawn);
 	if(pidp) *pidp=pid;
 
-	posix_spawnattr_setflags(attrp, flags); //maybe caller will use it again?
+	// restore flags, maybe caller will use it again?
+	posix_spawnattr_setflags(attrp, flags);
 
 	if(patch_exec) { //exec failed?
 		jbdswPatchExecDel(path);
 	}
-	else if(suspend && ret==0 && pid>0) {
+	else if(ret==0 && pid>0) {
 
-		if(jbdswPatchSpawn(pid, should_resume)!=0) //jdb fault? let it go
-			if(should_resume) kill(pid, SIGCONT);
+		if(suspend && jbdswPatchSpawn(pid, should_resume)!=0) //jdb fault? kill
+		{
+			kill(pid, SIGKILL);
+			ret = 98;
+			goto end;
+		}
 	}
 
+end:
 	if(attr) posix_spawnattr_destroy(&attr);
 	
 	return ret;
@@ -490,6 +496,7 @@ void applyKbdFix(void)
 #include <stdio.h>
 #include <libproc.h>
 #include <libproc_private.h>
+#include <sys/sysctl.h>
 
 //some process may be killed by sandbox if call systme getppid()
 pid_t __getppid()
@@ -501,15 +508,54 @@ pid_t __getppid()
     return procInfo.pbi_ppid;
 }
 
-#define CONTAINER_PATH_PREFIX   "/private/var/mobile/Containers/Data/" // +/Application,PluginKitPlugin,InternalDaemon
+static uid_t _CFGetSVUID(bool *successful) {
+    uid_t uid = -1;
+    struct kinfo_proc kinfo;
+    u_int miblen = 4;
+    size_t  len;
+    int mib[miblen];
+    int ret;
+    mib[0] = CTL_KERN;
+    mib[1] = KERN_PROC;
+    mib[2] = KERN_PROC_PID;
+    mib[3] = getpid();
+    len = sizeof(struct kinfo_proc);
+    ret = sysctl(mib, miblen, &kinfo, &len, NULL, 0);
+    if (ret != 0) {
+        uid = -1;
+        *successful = false;
+    } else {
+        uid = kinfo.kp_eproc.e_pcred.p_svuid;
+        *successful = true;
+    }
+    return uid;
+}
 
-void redirectEnvPath(const char* rootdir)
+bool _CFCanChangeEUIDs(void) {
+    static bool canChangeEUIDs;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        uid_t euid = geteuid();
+        uid_t uid = getuid();
+        bool gotSVUID = false;
+        uid_t svuid = _CFGetSVUID(&gotSVUID);
+        canChangeEUIDs = (uid == 0 || uid != euid || svuid != euid || !gotSVUID);
+    });
+    return canChangeEUIDs;
+}
+
+void loadPathHook()
 {
-    // char executablePath[PATH_MAX]={0};
-    // uint32_t bufsize=sizeof(executablePath);
-    // if(_NSGetExecutablePath(executablePath, &bufsize)==0 && strstr(executablePath,"testbin2"))
-    //     printf("redirectNSHomeDir %s, %s\n\n", rootdir, getenv("CFFIXED_USER_HOME"));
+	int64_t debugErr = jbdswDebugMe();
+	if (debugErr == 0) {
+		void* roothidehooks = dlopen_hook(JB_ROOT_PATH("/basebin/roothidehooks.dylib"), RTLD_NOW);
+		void (*pathhook)() = dlsym(roothidehooks, "pathhook");
+		pathhook();
+	}
+}
 
+void redirect_path_env(const char* rootdir)
+{
     //for now libSystem should be initlized, container should be set.
 
     char* homedir = NULL;
@@ -525,6 +571,7 @@ We just keep this bug:
         homedir = getenv("CFFIXED_USER_HOME");
         if(homedir)
         {
+#define CONTAINER_PATH_PREFIX   "/private/var/mobile/Containers/Data/" // +/Application,PluginKitPlugin,InternalDaemon
             if(strncmp(homedir, CONTAINER_PATH_PREFIX, sizeof(CONTAINER_PATH_PREFIX)-1) == 0)
             {
                 return; //containerized
@@ -557,7 +604,7 @@ We just keep this bug:
     setenv("CFFIXED_USER_HOME", newhome, 1);
 }
 
-void redirectDirs(const char* rootdir)
+void redirect_paths(const char* rootdir)
 {
     do { // only for jb process because some system process may crash when chdir
         
@@ -581,7 +628,11 @@ void redirectDirs(const char* rootdir)
             break;
 
         //for jailbroken binaries
-        redirectEnvPath(rootdir);
+        redirect_path_env(rootdir);
+		
+		if(_CFCanChangeEUIDs()) {
+			loadPathHook();
+		}
     
         pid_t ppid = __getppid();
         assert(ppid > 0);
@@ -615,8 +666,6 @@ __attribute__((constructor)) static void initializer(void)
 	JBRAND = strdup(getenv("JBRAND"));
 	JBROOT = strdup(getenv("JBROOT"));
 
-	redirectDirs(JBROOT);
-
 	struct dl_info di={0};
     dladdr((void*)initializer, &di);
 	strncpy(HOOK_DYLIB_PATH, di.dli_fname, sizeof(HOOK_DYLIB_PATH));
@@ -644,6 +693,8 @@ __attribute__((constructor)) static void initializer(void)
 		}
 	}
 
+	redirect_paths(JBROOT);
+
 	dlopen_hook(JB_ROOT_PATH("/usr/lib/roothideinit.dylib"), RTLD_NOW);
 
 	if (gExecutablePath) 
@@ -658,7 +709,7 @@ __attribute__((constructor)) static void initializer(void)
 		{
 			int64_t debugErr = jbdswDebugMe();
 			if (debugErr == 0) {
-				void* d = dlopen_hook(JB_ROOT_PATH("/basebin/rootlesshooks.dylib"), RTLD_NOW);
+				void* d = dlopen_hook(JB_ROOT_PATH("/basebin/roothidehooks.dylib"), RTLD_NOW);
 			}
 		}
 		else if (strcmp(gExecutablePath, "/usr/libexec/watchdogd") == 0) {

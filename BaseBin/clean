@@ -56,8 +56,8 @@ cd "watchdoghook"
 make clean
 cd -
 
-# rootlesshooks
-cd "rootlesshooks"
+# roothidehooks
+cd "roothidehooks"
 make clean
 cd -
 

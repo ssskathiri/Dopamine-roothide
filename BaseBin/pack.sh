@@ -100,11 +100,11 @@ make
 cd -
 cp "./watchdoghook/watchdoghook.dylib" ".tmp/basebin/watchdoghook.dylib"
 
-# rootlesshooks
-cd "rootlesshooks"
+# roothidehooks
+cd "roothidehooks"
 make clean && make
 cd -
-cp "./rootlesshooks/.theos/obj/rootlesshooks.dylib" ".tmp/basebin/rootlesshooks.dylib"
+cp "./roothidehooks/.theos/obj/roothidehooks.dylib" ".tmp/basebin/roothidehooks.dylib"
 
 # forkfix
 cd "forkfix"
