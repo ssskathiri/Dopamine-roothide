@@ -546,12 +546,15 @@ bool _CFCanChangeEUIDs(void) {
 
 void loadPathHook()
 {
-	int64_t debugErr = jbdswDebugMe();
-	if (debugErr == 0) {
-		void* roothidehooks = dlopen_hook(JB_ROOT_PATH("/basebin/roothidehooks.dylib"), RTLD_NOW);
-		void (*pathhook)() = dlsym(roothidehooks, "pathhook");
-		pathhook();
-	}
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+		int64_t debugErr = jbdswDebugMe();
+		if (debugErr == 0) {
+			void* roothidehooks = dlopen_hook(JB_ROOT_PATH("/basebin/roothidehooks.dylib"), RTLD_NOW);
+			void (*pathhook)() = dlsym(roothidehooks, "pathhook");
+			pathhook();
+		}
+	});
 }
 
 void redirect_path_env(const char* rootdir)
