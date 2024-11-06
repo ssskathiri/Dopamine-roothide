@@ -107,6 +107,10 @@ int posix_spawn_hook(pid_t *restrict pidp, const char *restrict path,
 					   char *const argv[restrict],
 					   char *const envp[restrict])
 {
+	if(!path) { //Don't crash here due to bad posix_spawn call
+		return spawn_hook_common(pidp, path, file_actions, attrp, argv, envp, posix_spawn);
+	}
+
 	int ret = -1;
 
 	posix_spawnattr_t attr=NULL;
