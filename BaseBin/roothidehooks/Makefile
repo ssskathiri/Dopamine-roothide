@@ -10,7 +10,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = roothidehooks
 
 roothidehooks_FILES = $(wildcard *.x) $(wildcard *.c) $(wildcard *.m)
-roothidehooks_CFLAGS = -Werror -fobjc-arc
+roothidehooks_CFLAGS = -Werror -fobjc-arc -I../_shared
 roothidehooks_LDFLAGS = -rpath @loader_path/.jbroot/Library/Frameworks -rpath @loader_path/fallback
 
 lsd.x_CFLAGS = -fno-objc-arc #lsd using mrc

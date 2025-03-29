@@ -140,7 +140,7 @@ int posix_spawn_hook(pid_t *restrict pidp, const char *restrict path,
 		if(jbdswPatchExecAdd(path, should_resume)!=0) { //jdb fault?
 			// restore flags
 			posix_spawnattr_setflags(attrp, flags);
-			ret = 99;
+			ret = 199;
 			goto end;
 		}
 	}
@@ -160,7 +160,7 @@ int posix_spawn_hook(pid_t *restrict pidp, const char *restrict path,
 		if(suspend && jbdswPatchSpawn(pid, should_resume)!=0) //jdb fault? kill
 		{
 			kill(pid, SIGKILL);
-			ret = 98;
+			ret = 198;
 			goto end;
 		}
 	}
@@ -606,30 +606,33 @@ We just keep this bug:
         homedir = "/var/empty";
     }
 
-    char newhome[PATH_MAX]={0};
-    snprintf(newhome,sizeof(newhome),"%s/%s",rootdir,homedir);
-    setenv("CFFIXED_USER_HOME", newhome, 1);
+	if(homedir[0] == '/') {
+		char newhome[PATH_MAX*2]={0};
+		strlcpy(newhome, rootdir, sizeof(newhome));
+		strlcat(newhome, homedir, sizeof(newhome));
+		setenv("CFFIXED_USER_HOME", newhome, 1);
+	}
 }
 
 void redirect_paths(const char* rootdir)
 {
-    do { // only for jb process because some system process may crash when chdir
+    do {
         
         char executablePath[PATH_MAX]={0};
         uint32_t bufsize=sizeof(executablePath);
         if(_NSGetExecutablePath(executablePath, &bufsize) != 0)
             break;
         
-        char realexepath[PATH_MAX];
+        char realexepath[PATH_MAX]={0};
         if(!realpath(executablePath, realexepath))
             break;
             
-        char realjbroot[PATH_MAX];
+        char realjbroot[PATH_MAX+1]={0};
         if(!realpath(rootdir, realjbroot))
             break;
         
-        if(realjbroot[strlen(realjbroot)] != '/')
-            strcat(realjbroot, "/");
+        if(realjbroot[0] && realjbroot[strlen(realjbroot)-1] != '/')
+            strlcat(realjbroot, "/", sizeof(realjbroot));
         
         if(strncmp(realexepath, realjbroot, strlen(realjbroot)) != 0)
             break;
@@ -675,7 +678,7 @@ __attribute__((constructor)) static void initializer(void)
 
 	struct dl_info di={0};
     dladdr((void*)initializer, &di);
-	strncpy(HOOK_DYLIB_PATH, di.dli_fname, sizeof(HOOK_DYLIB_PATH));
+	strlcpy(HOOK_DYLIB_PATH, di.dli_fname, sizeof(HOOK_DYLIB_PATH));
 
 	if (!strcmp(getenv("DYLD_INSERT_LIBRARIES"), HOOK_DYLIB_PATH)) {
 		// Unset DYLD_INSERT_LIBRARIES, but only if we are the only thing contained in it

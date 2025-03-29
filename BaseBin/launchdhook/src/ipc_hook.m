@@ -4,6 +4,11 @@
 #import <sandbox.h>
 #import "substrate.h"
 
+/* csops  operations */
+#define	CS_OPS_STATUS		0	/* return status */
+#define CS_PLATFORM_BINARY          0x04000000  /* this is a platform binary */
+int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
+
 NSString* getAppIdentifierForPath(const char* path);
 BOOL roothideBlacklistedApp(NSString* identifier);
 
@@ -24,26 +29,35 @@ int sandbox_check_by_audit_token_hook(audit_token_t au, const char *operation, i
 	const void *arg10 = va_arg(a, void *);
 	va_end(a);
 	if (name && operation) {
-		if (strcmp(operation, "mach-lookup") == 0) {
-			if (strncmp((char *)name, "cy:", 3) == 0 || strncmp((char *)name, "lh:", 3) == 0) {
-				
-				bool allow=true;
-				char pathbuf[PATH_MAX]={0};
-				pid_t pid = audit_token_to_pid(au);
-				if(pid>0 && proc_pidpath(pid, pathbuf, sizeof(pathbuf))>0) {
-					NSString* appIdentifier = getAppIdentifierForPath(pathbuf);
-					if(appIdentifier && roothideBlacklistedApp(appIdentifier)) {
-						JBLogDebug("%s roothideBlacklistedApp:%s, %s", name, appIdentifier.UTF8String, pathbuf);
-						allow=false;
-					} 
-				}
-				
-				if(allow) {
-					/* always allow */
-					return 0;
-				}
+		pid_t pid = audit_token_to_pid(au);
+		uid_t uid = audit_token_to_euid(au);
+
+		uint32_t csFlags = 0;
+		csops(pid, CS_OPS_STATUS, &csFlags, sizeof(csFlags));
+
+		bool allow=false;
+		if(strcmp(operation, "mach-lookup") == 0) {
+			volatile int result1 = strncmp((char *)name, "cy:", 3);
+			volatile int result2 = strncmp((char *)name, "lh:", 3);
+			if (result1 == 0 || result2 == 0) {
+				allow = true;
 			}
 		}
+
+		if(uid==501 && (csFlags & CS_PLATFORM_BINARY)==0)
+		{
+			char pathbuf[4*MAXPATHLEN]={0};
+			if(pid>0 && proc_pidpath(pid, pathbuf, sizeof(pathbuf))>0)
+			{
+				NSString* appIdentifier = getAppIdentifierForPath(pathbuf);
+				if(appIdentifier && roothideBlacklistedApp(appIdentifier)) {
+					JBLogDebug("sandbox_check_by_audit_token operation=%s name=%s from %s", operation, name, pathbuf);
+					allow = false;
+				} 
+			}
+		}
+
+		if(allow) return 0;
 	}
 	return sandbox_check_by_audit_token_orig(au, operation, sandbox_filter_type, name, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
 }

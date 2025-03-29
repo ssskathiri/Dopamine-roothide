@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import <mach-o/dyld.h>
 
 #ifndef DEBUG
 #define NSLog(args...)	
@@ -6,8 +7,9 @@
 
 NSString* safe_getExecutablePath()
 {
-	extern char*** _NSGetArgv();
-	char* executablePathC = **_NSGetArgv();
+	char executablePathC[PATH_MAX];
+	uint32_t executablePathCSize = sizeof(executablePathC);
+	_NSGetExecutablePath(&executablePathC[0], &executablePathCSize);
 	return [NSString stringWithUTF8String:executablePathC];
 }
 
@@ -20,11 +22,11 @@ NSString* getProcessName()
 {
 	NSLog(@"roothidehooks coming... %@", safe_getExecutablePath());
 	NSString *processName = getProcessName();
-	if ([processName isEqualToString:@"installd"]) {
+	/*if ([processName isEqualToString:@"installd"]) {
 		extern void installdInit(void);
-		//installdInit();
+		installdInit();
 	}
-	else if ([processName isEqualToString:@"cfprefsd"]) {
+	else*/ if ([processName isEqualToString:@"cfprefsd"]) {
 		extern void cfprefsdInit(void);
 		cfprefsdInit();
 	}
